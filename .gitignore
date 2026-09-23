@@ -1,0 +1,45 @@
+# ---------- 依赖 ----------
+node_modules/
+.pnpm-store/
+
+# ---------- 构建产物 ----------
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# ---------- Hardhat ----------
+artifacts/
+cache/
+coverage/
+coverage.json
+typechain/
+typechain-types/
+
+# ---------- 环境变量与密钥（绝对不要提交！）----------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+keystore/
+wallet.json
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 日志 ----------
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- 临时文件 ----------
+*.tmp
+*.bak
+~$*

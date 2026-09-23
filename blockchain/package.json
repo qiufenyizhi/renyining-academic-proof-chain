@@ -1,0 +1,23 @@
+{
+  "name": "academic-proof-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "科研链证 —— 学术成果原创性与AIGC贡献存证平台（智能合约层）",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "gas": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "verify:env": "hardhat run scripts/check-env.js --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.29.1",
+    "hardhat-gas-reporter": "^2.3.0",
+    "solidity-coverage": "^0.8.17"
+  }
+}
