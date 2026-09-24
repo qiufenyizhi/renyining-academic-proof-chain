@@ -18,8 +18,61 @@ function check(label, ok, detail = "") {
   if (!ok) failures += 1;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 自定义 error 判定工具
+//
+// ⚠️ 踩坑记录（2026-09-23，真实 Sepolia 实测）：
+// 同一个 revert，本地链与真实网络给到的报错形状完全不同：
+//   本地 hardhat : message = "VM Exception ... reverted with custom error 'AlreadyRegistered()'"
+//   真实 Sepolia : message = "execution reverted"（不含错误名！）
+// 真实网络的错误名**只存在于 e.data 的 4 字节选择器**里（如 0x3a81d6fc）。
+// 因此用 message.includes("AlreadyRegistered") 判定必然在真实网络上失败。
+// 正确做法：从合约 ABI 现算各自定义 error 的选择器，再匹配 e.data。
+// ─────────────────────────────────────────────────────────────
+let ERROR_SELECTORS = null;
+
+function initErrorSelectors(contract) {
+  ERROR_SELECTORS = {};
+  for (const frag of contract.interface.fragments) {
+    if (frag.type === "error") {
+      ERROR_SELECTORS[frag.selector] = frag.name; // selector 形如 "0x3a81d6fc"
+    }
+  }
+}
+
+/// 从捕获到的异常中解析出自定义 error 名；解析不出来返回 null
+function customErrorName(e) {
+  const data =
+    e?.data ??
+    e?.info?.error?.data ??
+    e?.error?.data ??
+    e?.receipt?.revertReason ??
+    null;
+  if (typeof data === "string" && data.startsWith("0x") && data.length >= 10) {
+    const selector = data.slice(0, 10).toLowerCase();
+    if (ERROR_SELECTORS && ERROR_SELECTORS[selector]) return ERROR_SELECTORS[selector];
+  }
+  // 兜底：部分节点会把错误名写进 message
+  const m = String(e?.message ?? "").match(/custom error '([A-Za-z0-9_]+)\(/);
+  if (m) return m[1];
+  return null;
+}
+
+/// 断言某次调用必须以指定 custom error 失败（只做 staticCall 模拟，不上链、不花 gas）
+async function expectRevertWith(fn, expectedName) {
+  try {
+    await fn();
+    return { ok: false, detail: "未按预期拒绝（调用居然成功了）" };
+  } catch (e) {
+    const name = customErrorName(e);
+    if (name === expectedName) return { ok: true, detail: name };
+    return { ok: false, detail: `预期 ${expectedName}，实际 ${name ?? "未知错误：" + String(e.message).slice(0, 60)}` };
+  }
+}
+
 async function main() {
   const net = await hre.ethers.provider.getNetwork();
+  const isLocal = hre.network.name === "hardhat" || hre.network.name === "localhost";
   const [signer] = await hre.ethers.getSigners();
   const balance = await hre.ethers.provider.getBalance(signer.address);
 
@@ -36,9 +89,8 @@ async function main() {
   console.log("[1/6] 网络连接与账户");
   check("RPC 可访问，能取到 chainId", net.chainId > 0n, `chainId=${net.chainId}`);
   check("账户已加载", !!signer.address);
-  const isLocal = hre.network.name === "hardhat" || hre.network.name === "localhost";
   if (!isLocal) {
-    check("Sepolia 余额 > 0（部署需 gas）", balance > 0n, hre.ethers.formatEther(balance) + " ETH");
+    check("余额 > 0（部署需 gas）", balance > 0n, hre.ethers.formatEther(balance) + " ETH");
   } else {
     console.log("  ⓘ 本地链模式，余额检查跳过（hardhat 默认给足 10000 ETH）");
   }
@@ -49,6 +101,7 @@ async function main() {
   const contract = await factory.deploy();
   await contract.waitForDeployment();
   const address = await contract.getAddress();
+  initErrorSelectors(contract); // 供后续自定义 error 判定使用
   check("部署成功，拿到合约地址", /^0x[0-9a-fA-F]{40}$/.test(address), address);
   check("admin 为部署账户", (await contract.admin()) === signer.address);
   check("初始 workCount 为 0", (await contract.workCount()) === 0n);
@@ -100,7 +153,7 @@ async function main() {
   // ---------- 5. 边界与权限 ----------
   console.log("\n[5/6] 边界与权限（安全测试预演）");
   if (!isLocal) {
-    console.log("  ⓘ 非本地链，无法模拟第三方账户，权限类用例请用 npm test 在本地跑");
+    console.log("  ⓘ 非本地链，无法模拟第三方账户，权限类用例请用 npx hardhat test 在本地跑");
   }
   const other = isLocal
     ? await (async () => {
@@ -112,32 +165,48 @@ async function main() {
       })()
     : null;
 
-  let dupRejected = false;
-  try {
-    await contract.registerWork(realHash, "重复登记", 0, 0, "");
-  } catch (e) {
-    dupRejected = String(e.message).includes("AlreadyRegistered");
-  }
-  check("重复指纹登记被拒（AlreadyRegistered）", dupRejected);
+  // ⚠️ 下面这些"预期失败"的调用必须用 staticCall：
+  // 它只做链上模拟，不上链、不消耗 gas、不占用 nonce。
+  // 若直接发送交易，ethers 会在发送前做 gas 估算，报错对象形状随网络而变，
+  // 且真实网络上每笔"注定失败"的交易还会浪费 nonce 与手续费。
+  const dup = await expectRevertWith(
+    () => contract.registerWork.staticCall(realHash, "重复登记", 0, 0, ""),
+    "AlreadyRegistered"
+  );
+  check("重复指纹登记被拒（AlreadyRegistered）", dup.ok, dup.detail);
 
-  let ratioRejected = false;
-  try {
-    const h3 = hre.ethers.sha256(hre.ethers.toUtf8Bytes("ratio-test"));
-    await contract.registerWork(h3, "比例越界", 0, 101, "");
-  } catch (e) {
-    ratioRejected = String(e.message).includes("InvalidRatio");
-  }
-  check("AIGC 比例 > 100 被拒（InvalidRatio）", ratioRejected);
+  const ratio = await expectRevertWith(
+    () =>
+      contract.registerWork.staticCall(
+        hre.ethers.sha256(hre.ethers.toUtf8Bytes("ratio-test")),
+        "比例越界",
+        0,
+        101,
+        ""
+      ),
+    "InvalidRatio"
+  );
+  check("AIGC 比例 > 100 被拒（InvalidRatio）", ratio.ok, ratio.detail);
+
+  const zeroHash = await expectRevertWith(
+    () => contract.registerWork.staticCall(hre.ethers.ZeroHash, "零指纹", 0, 0, ""),
+    "ZeroHash"
+  );
+  check("全零指纹被拒（ZeroHash）", zeroHash.ok, zeroHash.detail);
 
   if (other) {
-    let notAuthorRejected = false;
-    try {
-      const h4 = hre.ethers.sha256(hre.ethers.toUtf8Bytes("fake-version"));
-      await contract.connect(other).addVersion(workId, h4, 10);
-    } catch (e) {
-      notAuthorRejected = String(e.message).includes("NotAuthor");
-    }
-    check("非作者追加版本被拒（NotAuthor）", notAuthorRejected);
+    const notAuthor = await expectRevertWith(
+      () =>
+        contract
+          .connect(other)
+          .addVersion.staticCall(
+            workId,
+            hre.ethers.sha256(hre.ethers.toUtf8Bytes("fake-version")),
+            10
+          ),
+      "NotAuthor"
+    );
+    check("非作者追加版本被拒（NotAuthor）", notAuthor.ok, notAuthor.detail);
 
     await hre.network.provider.send("hardhat_stopImpersonatingAccount", [
       "0x000000000000000000000000000000000000dEaD",

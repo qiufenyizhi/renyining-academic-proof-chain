@@ -46,6 +46,10 @@ module.exports = {
       chainId: 11155111,
       accounts: sepoliaAccounts,
     },
+    // 说明：曾尝试配置 sepolia_fork（本地分叉真实测试网）来离线复现真实网络的报错行为，
+    // 但本版 Hardhat（2.29.1 / EDR 0.3.8）对具名网络无法启用 forking
+    // （hardhat_setBalance / hardhat_metadata 均返回 Method not found），故不保留该配置。
+    // 需要验证真实网络行为时，直接跑：--network sepolia
   },
 
   etherscan: {
