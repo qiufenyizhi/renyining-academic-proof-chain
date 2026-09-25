@@ -266,6 +266,36 @@ describe("AcademicProof 科研链证核心合约", function () {
   });
 
   // ══════════════════════════════════════════════════════════
+  // 组6.5 · 【缺陷复现】登记时并未把 AIGC 工具名写入链上
+  //
+  // 背景（2026-09-26 发现）：
+  //   前端登记页允许用户勾选 AI 工具并填写用途，成功页还标注该文本「已上链」。
+  //   但 registerWork 只写入 aigcRatio，工具名只存在于 declareAIGC 的 _aigcTools 数组。
+  //   因此登记完成后 getAigcTools() 为空 —— 前端那句「已上链」是错的。
+  //   这两个用例把该缺陷钉死：修复后二者应改为断言「已写入」。
+  // ══════════════════════════════════════════════════════════
+  describe("组6.5 【缺陷复现】登记时的 AIGC 工具名未上链", function () {
+    it("registerWork 之后 getAigcTools 为空数组（工具名丢失）", async function () {
+      await contract.connect(author).registerWork(V1, TITLE, WorkType.Paper, 25, "");
+      const tools = await contract.getAigcTools(1);
+      expect(tools.length).to.equal(0); // ← 暴露问题：用户填的工具名没了
+    });
+
+    it("但比例确实已上链（说明只丢了工具名，不是全没写）", async function () {
+      await contract.connect(author).registerWork(V1, TITLE, WorkType.Paper, 25, "");
+      expect(Number((await contract.getWork(1)).aigcRatio)).to.equal(25);
+    });
+
+    it("必须显式调用 declareAIGC 才会留下工具名", async function () {
+      await contract.connect(author).registerWork(V1, TITLE, WorkType.Paper, 25, "");
+      await contract.connect(author).declareAIGC(1, 25, "DeepSeek（用途：生成初步框架）");
+      const tools = await contract.getAigcTools(1);
+      expect(tools.length).to.equal(1);
+      expect(tools[0]).to.equal("DeepSeek（用途：生成初步框架）");
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
   // 组7 · raiseDispute 争议登记
   // ══════════════════════════════════════════════════════════
   describe("组7 raiseDispute 争议登记", function () {

@@ -12,7 +12,7 @@ import { ElMessage } from 'element-plus'
 import FileDropzone from '@/components/FileDropzone.vue'
 import RoleBar from '@/components/RoleBar.vue'
 import { useWallet } from '@/composables/useWallet.js'
-import { WORK_TYPE, WORK_TYPE_LABEL, parseContractError } from '@/contracts/abi.js'
+import { WORK_TYPE_LABEL, parseContractError } from '@/contracts/abi.js'
 import { formatTimestamp } from '@/utils/format.js'
 import { shortHash } from '@/utils/hash.js'
 import { explorerTxUrl } from '@/contracts/config.js'
@@ -22,13 +22,14 @@ const { isConnected, requireContract, isWrongChain } = useWallet()
 
 const dropRef = ref(null)
 const submitting = ref(false)
+const declaring = ref(false)
 const checking = ref(false)
 const existing = ref(null) // 若指纹已登记，存此处
 const result = ref(null) // 登记成功结果
 
 const form = reactive({
   title: '',
-  workType: WORK_TYPE.Paper,
+  workType: 0, // 0 = Paper（论文），避免依赖模板作用域里未导入的 WORK_TYPE
   aigcRatio: 0,
   metaURI: '',
   // AIGC 声明：勾选的工具 + 用途说明
@@ -173,12 +174,38 @@ async function submit() {
   }
 }
 
+/// 把 AIGC 工具声明真正写入链上
+///
+/// 背景：registerWork 只写入 aigcRatio，工具名称需要单独调用 declareAIGC 才会进链。
+/// 见 blockchain/test/AcademicProof.test.js「组6.5 【缺陷复现】」。
+async function declareAigcNow() {
+  if (!result.value?.toolsText) return
+  declaring.value = true
+  try {
+    const c = requireContract()
+    const tx = await c.declareAIGC(
+      BigInt(result.value.workId),
+      Number(result.value.aigcRatio),
+      result.value.toolsText
+    )
+    ElMessage.info('正在将声明写入链上…')
+    await tx.wait()
+    result.value.aigcDeclaredTools = result.value.toolsText
+    result.value.toolsText = '' // 清掉警告，改显示成功提示
+    ElMessage.success('AIGC 工具声明已上链')
+  } catch (e) {
+    ElMessage.error(parseContractError(e))
+  } finally {
+    declaring.value = false
+  }
+}
+
 function resetAll() {
   result.value = null
   existing.value = null
   currentHash.value = ''
   form.title = ''
-  form.workType = WORK_TYPE.Paper
+  form.workType = 0
   form.aigcRatio = 0
   form.metaURI = ''
   form.tools = []
@@ -240,8 +267,47 @@ function resetAll() {
       <div class="info-label">内容指纹（SHA-256）</div>
       <div class="hash-box" style="margin-bottom: 12px">{{ result.hash }}</div>
 
-      <div class="info-label">AIGC 声明（已上链）</div>
-      <div class="declared-box" style="margin-bottom: 18px">{{ result.toolsText }}</div>
+      <div class="info-label">AIGC 介入比例（已上链）</div>
+      <div class="declared-box" style="margin-bottom: 12px">
+        <strong style="color: var(--brand-primary)">{{ result.aigcRatio }}%</strong>
+        <span class="text-muted"> —— 该比例已写入链上成果记录，不可篡改</span>
+      </div>
+
+      <el-alert
+        v-if="result.toolsText"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 18px"
+      >
+        <template #title>AI 工具名称尚未上链</template>
+        <div style="font-size: 13px; margin-top: 4px">
+          你填写的声明内容为：<strong>{{ result.toolsText }}</strong><br />
+          当前合约的登记接口只写入 AIGC <em>比例</em>，工具名称需要单独调用一次
+          <code>declareAIGC</code> 才能留存在链上。
+          <div style="margin-top: 10px">
+            <el-button
+              size="small"
+              type="warning"
+              :loading="declaring"
+              @click="declareAigcNow"
+            >
+              立即将声明写入链上（需再签一次名）
+            </el-button>
+          </div>
+        </div>
+      </el-alert>
+
+      <el-alert
+        v-else-if="result.aigcDeclaredTools"
+        type="success"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 18px"
+      >
+        <template #title>AIGC 工具声明已上链</template>
+        <div style="font-size: 13px; margin-top: 4px">{{ result.aigcDeclaredTools }}</div>
+      </el-alert>
 
       <div class="success-actions">
         <el-button type="primary" @click="router.push(`/work/${result.workId}`)">
