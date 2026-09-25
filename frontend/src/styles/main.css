@@ -1,0 +1,260 @@
+/* src/styles/main.css —— 全局设计变量与基础样式 */
+
+:root {
+  --brand-primary: #2f6bff;
+  --brand-primary-dark: #1f52d0;
+  --brand-success: #22c55e;
+  --brand-danger: #ef4444;
+  --brand-warning: #f59e0b;
+
+  --brand-text-strong: #101828;
+  --brand-text: #344054;
+  --brand-text-muted: #667085;
+
+  --brand-bg: #f7f8fa;
+  --brand-bg-soft: #eef2ff;
+  --brand-border: #e4e7ec;
+
+  --brand-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --brand-radius: 12px;
+  --brand-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --brand-shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 通用容器 ---------- */
+.page-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--brand-text-strong);
+}
+
+.page-desc {
+  margin: 0 0 22px;
+  color: var(--brand-text-muted);
+  font-size: 14px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--brand-border);
+  border-radius: var(--brand-radius);
+  box-shadow: var(--brand-shadow);
+  padding: 22px;
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.card-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--brand-text-strong);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* ---------- 等宽字体（哈希、地址） ---------- */
+.mono {
+  font-family: var(--brand-mono);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.hash-box {
+  font-family: var(--brand-mono);
+  font-size: 13px;
+  background: #f2f4f7;
+  border: 1px solid var(--brand-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  word-break: break-all;
+  color: var(--brand-text-strong);
+}
+
+/* ---------- 角色提示条（演示脚本 D6） ---------- */
+.role-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 18px;
+  border: 1px solid;
+}
+
+.role-bar.author {
+  background: #eef2ff;
+  border-color: #c7d7fe;
+  color: #3538cd;
+}
+
+.role-bar.verifier {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.role-bar .role-label {
+  font-weight: 700;
+}
+
+/* ---------- 结论大字（演示脚本 D4）---------- */
+.verdict {
+  text-align: center;
+  padding: 34px 20px;
+  border-radius: var(--brand-radius);
+  border: 2px solid;
+}
+
+.verdict.ok {
+  background: #f0fdf4;
+  border-color: var(--brand-success);
+}
+
+.verdict.fail {
+  background: #fef2f2;
+  border-color: var(--brand-danger);
+}
+
+.verdict-icon {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.verdict-title {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.verdict.ok .verdict-title {
+  color: #15803d;
+}
+
+.verdict.fail .verdict-title {
+  color: #b91c1c;
+}
+
+.verdict-sub {
+  color: var(--brand-text-muted);
+  font-size: 14px;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+/* ---------- 信息网格 ---------- */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.info-item .info-label {
+  font-size: 12px;
+  color: var(--brand-text-muted);
+  margin-bottom: 3px;
+}
+
+.info-item .info-value {
+  font-size: 14px;
+  color: var(--brand-text-strong);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* ---------- 上传区 ---------- */
+.upload-zone {
+  border: 2px dashed var(--brand-border);
+  border-radius: var(--brand-radius);
+  padding: 34px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+  background: #fcfcfd;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: var(--brand-primary);
+  background: var(--brand-bg-soft);
+}
+
+.upload-zone .up-icon {
+  color: var(--brand-primary);
+  margin-bottom: 10px;
+}
+
+.upload-zone .up-main {
+  font-size: 15px;
+  color: var(--brand-text-strong);
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.upload-zone .up-sub {
+  font-size: 12px;
+  color: var(--brand-text-muted);
+}
+
+/* ---------- 隐私强调标记（演示脚本 D2）---------- */
+.privacy-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 20px;
+  padding: 4px 12px;
+}
+
+/* ---------- 页面通用间距 ---------- */
+.stack-sm > * + * {
+  margin-top: 12px;
+}
+
+.stack > * + * {
+  margin-top: 18px;
+}
+
+.text-muted {
+  color: var(--brand-text-muted);
+}
+
+.text-strong {
+  color: var(--brand-text-strong);
+  font-weight: 600;
+}
+
+.center {
+  text-align: center;
+}
