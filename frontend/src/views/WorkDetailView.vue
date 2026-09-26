@@ -258,9 +258,14 @@ async function submitDispute() {
 }
 
 // ---------------- 操作：导出证书 ----------------
+//
+// 实现说明：证书以「HTML + 浏览器打印」方式导出，而不是 jsPDF 直接生成 PDF。
+// 原因：jsPDF 默认字体（Helvetica 等标准 PDF 字体）不含中文字形，
+// 直接生成会导致中文乱码（2026-09-26 实测确认）。
+// 改用浏览器打印可调用系统中文字体，产物为可搜索的矢量文字。
 function handleExport() {
   try {
-    const filename = exportCertificate({
+    const ok = exportCertificate({
       workId: work.value.workId,
       title: work.value.title,
       author: work.value.author,
@@ -276,7 +281,17 @@ function handleExport() {
       chainName: CURRENT_CHAIN.name,
       explorer: CURRENT_CHAIN.explorer,
     })
-    ElMessage.success(`证书已导出：${filename}`)
+
+    if (!ok) {
+      ElMessage.warning('浏览器拦截了新窗口，请允许弹出窗口后重试')
+      return
+    }
+
+    ElMessage({
+      type: 'success',
+      duration: 6000,
+      message: '证书已在预览页打开，请在打印对话框中选「另存为 PDF」',
+    })
   } catch (e) {
     ElMessage.error('导出失败：' + (e.message || e))
   }
@@ -325,8 +340,8 @@ async function confirmDispute() {
           </div>
         </div>
         <el-button @click="handleExport">
-          <el-icon><Download /></el-icon>
-          导出存证证书
+          <el-icon><Printer /></el-icon>
+          导出存证证书（PDF）
         </el-button>
       </div>
 
