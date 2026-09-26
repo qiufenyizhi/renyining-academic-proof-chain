@@ -28,6 +28,37 @@ function esc(s) {
     .replace(/'/g, '&#39;')
 }
 
+/// 生成证书的文档标题 —— 同时作为「另存为 PDF」时的默认文件名
+///
+/// 命名规则：科研链证-存证证书-{workId}-{标题}
+/// 例：科研链证-存证证书-1-"思想道德与法治"课社会实践报告书202503
+///
+/// 三点处理：
+///   1. 剔除 Windows 文件名非法字符 \\ / : * ? " < > |，替换为下划线
+///   2. 标题超过 MAX_TITLE_LEN 字符时截断并加省略号（避免文件名过长）
+///   3. 标题为空时省略该段（不留多余的连字符）
+const MAX_TITLE_LEN = 40
+
+function buildDocTitle(workId, title) {
+  const base = `科研链证-存证证书-${workId}`
+
+  let t = String(title ?? '')
+    .replace(/[\\/:*?"<>|]/g, '_') // 非法字符
+    .replace(/\s+/g, ' ') // 连续空白压成一个空格
+    .trim()
+
+  if (!t) return base
+
+  if (t.length > MAX_TITLE_LEN) {
+    t = t.slice(0, MAX_TITLE_LEN) + '…'
+  }
+
+  return `${base}-${t}`
+}
+
+/** 供测试与调试：查看某个成果会生成什么文件名 */
+export { buildDocTitle }
+
 function buildCertificateHtml(data) {
   const rows = [
     ['成果标题', data.title],
@@ -50,6 +81,11 @@ function buildCertificateHtml(data) {
     )
     .join('')
 
+  // 文件名：浏览器「另存为 PDF」默认取 <title> 作为文件名。
+  // 命名规则：科研链证-存证证书-{workId}-{标题}
+  // 标题可能很长，需限制长度并剔除文件名非法字符（Windows 不允许 \ / : * ? " < > |）。
+  const docTitle = buildDocTitle(data.workId, data.title)
+
   const toolsBlock = data.tools && data.tools.length
     ? `<h2>三、AIGC 贡献声明（已上链，不可篡改）</h2>
        <ul class="tools">${data.tools.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`
@@ -62,7 +98,7 @@ function buildCertificateHtml(data) {
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>科研链证-存证证书-${esc(data.workId)}</title>
+<title>${esc(docTitle)}</title>
 <style>
   @page { size: A4; margin: 16mm 14mm; }
   * { box-sizing: border-box; }
@@ -120,12 +156,19 @@ function buildCertificateHtml(data) {
     margin-bottom: 16px;
   }
   @media print { .tip { display: none; } }
+  .fname { margin-top: 6px; }
+  .fname code {
+    font-family: Consolas, "Courier New", monospace;
+    background: #fff; padding: 2px 6px; border-radius: 4px;
+    border: 1px solid #fed7aa; word-break: break-all;
+  }
 </style>
 </head>
 <body>
   <div class="tip">
     <b>请在打印对话框中选择「另存为 PDF」</b>，并关闭「页眉和页脚」以获得干净的证书。
-    本页面为证书预览，打印后即为正式凭证。
+    另存时的默认文件名即为下方所示，可在对话框中自行修改。
+    <div class="fname">建议文件名：<code>${esc(docTitle)}.pdf</code></div>
   </div>
 
   <div class="head">
